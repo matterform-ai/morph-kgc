@@ -7,6 +7,7 @@ __email__ = "arenas.guerrero.julian@outlook.com"
 
 
 import errno
+import json
 import os
 import logging
 import multiprocessing as mp
@@ -313,6 +314,19 @@ class Config(ConfigParser):
 
     def get_data_sources_sections(self):
         return list(set(self.sections()) - {self.configuration_section})
+
+    def get_excel_options(self, source_section):
+        """Excel sheet (JSON name/index), zero-based header and pandas engine."""
+        sheet = json.loads(self.get(source_section, 'excel_sheet', fallback='0'))
+        header = json.loads(self.get(source_section, 'excel_header', fallback='0'))
+        if not (isinstance(sheet, str) or type(sheet) is int and sheet >= 0):
+            raise ValueError('excel_sheet must be a JSON string or nonnegative integer')
+        if type(header) is not int or header < 0:
+            raise ValueError('excel_header must be a nonnegative integer')
+        engine = self.get(source_section, 'excel_engine', fallback='openpyxl')
+        if engine not in ('openpyxl', 'xlrd', 'auto'):
+            raise ValueError('excel_engine must be openpyxl, xlrd or auto')
+        return dict(sheet_name=sheet, header=header, engine=None if engine == 'auto' else engine)
 
     def has_file_path(self, source_section):
         return self.has_option(source_section, FILE_PATH)

@@ -864,10 +864,12 @@ class MappingParser:
 
     # TODO: deprecate
     def _remove_self_joins_no_condition(self):
+        if getattr(self.config, '_capture_provenance', False):
+            return  # Preserve each contributing row, including duplicate join matches.
         for i, rml_rule in self.rml_df.iterrows():
             if rml_rule['object_map_type'] == RML_PARENT_TRIPLES_MAP:
                 parent_triples_map_rule = get_rml_rule(self.rml_df, rml_rule['object_map_value'])
-                if rml_rule['logical_source_value'] == parent_triples_map_rule['logical_source_value'] and str(
+                if rml_rule['source_name'] == parent_triples_map_rule['source_name'] and rml_rule['logical_source_value'] == parent_triples_map_rule['logical_source_value'] and str(
                         # str() is to be able to compare None
                         rml_rule['iterator']) == str(parent_triples_map_rule['iterator']):
 

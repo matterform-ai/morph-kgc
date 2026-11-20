@@ -21,7 +21,7 @@ from ..constants import *
 from ..utils import normalize_hierarchical_data
 
 
-def get_file_data(rml_rule, references):
+def get_file_data(rml_rule, references, config=None):
     references = list(references)
     file_source_type = rml_rule['source_type']
 
@@ -30,7 +30,7 @@ def get_file_data(rml_rule, references):
     elif file_source_type in [CSV, TSV]:
         return _read_csv(rml_rule, references, file_source_type)
     elif file_source_type in EXCEL:
-        return _read_excel(rml_rule, references)
+        return _read_excel(rml_rule, references, config)
     elif file_source_type in ODS:
         return _read_ods(rml_rule, references)
     elif file_source_type == PARQUET:
@@ -148,14 +148,29 @@ def _read_spss(rml_rule, references):
     return pd.read_spss(rml_rule['logical_source_value'], usecols=references, convert_categoricals=False)
 
 
-def _read_excel(rml_rule, references):
-    return pd.read_excel(rml_rule['logical_source_value'],
-                         sheet_name=0,
-                         engine='openpyxl',
-                         usecols=references,
-                         dtype=str,
-                         keep_default_na=False,
-                         na_filter=False)
+def _read_excel(rml_rule, references, config=None):
+    options = config.get_excel_options(rml_rule['source_name']) if config is not None else dict(
+        sheet_name=0, header=0, engine='openpyxl')
+    capture = getattr(config, '_capture_provenance', False)
+    with pd.ExcelFile(rml_rule['logical_source_value'], engine=options['engine']) as book:
+        sheet = options['sheet_name']
+        if isinstance(sheet, int):
+            sheet = book.sheet_names[sheet]
+        data = pd.read_excel(book, sheet_name=sheet, header=options['header'],
+                             usecols=None if capture else references, dtype=str,
+                             keep_default_na=False, na_filter=False)
+        if capture:
+            # Read original headers: pandas otherwise silently disambiguates duplicates.
+            headers = pd.read_excel(book, sheet_name=sheet, header=None,
+                                    skiprows=options['header'], nrows=1,
+                                    dtype=str, keep_default_na=False).iloc[0].tolist()
+            if any(headers.count(ref) != 1 for ref in references):
+                raise ValueError('Provenance requires unique, literal Excel column headers')
+            columns = {ref: headers.index(ref) + 1 for ref in references}
+            data = data[list(references)]
+            data.attrs['source_coordinates'] = dict(
+                sheet=sheet, first_row=options['header'] + 2, columns=columns)
+        return data
 
 
 def _read_ods(rml_rule, references):

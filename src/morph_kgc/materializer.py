@@ -58,10 +58,13 @@ def _get_data(config, rml_rule, references, python_source=None):
     elif rml_rule['source_type'] == PGDB:
         data = get_pg_data(config, rml_rule, references)
     elif rml_rule['source_type'] in FILE_SOURCE_TYPES:
-        data = get_file_data(rml_rule, references)
+        data = get_file_data(rml_rule, references, config)
     elif rml_rule['source_type'] in IN_MEMORY_TYPES:
         data = get_ram_data(rml_rule, references, python_source)
 
+    if getattr(config, '_capture_provenance', False):
+        from .provenance import attach_source_coordinates
+        data = attach_source_coordinates(data, rml_rule, references)
     data = _preprocess_data(data, rml_rule, references, config)
 
     return data
@@ -250,6 +253,7 @@ def _merge_data(data, parent_data, rml_rule, join_condition):
 
 def _materialize_rml_rule(rml_rule, rml_df, fnml_df, config, data=None, parent_join_references=set(), nest_level=0,
                           python_source=None):
+    rml_rule = rml_rule.copy()
     references = set(_get_references_in_rml_rule(rml_rule, rml_df, fnml_df))
 
     references_subject_join, parent_references_subject_join = get_references_in_join_condition(rml_rule, 'subject_join_conditions')

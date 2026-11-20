@@ -113,3 +113,9 @@ def materialize_kafka(config, python_source=None):
         # close the Kafka producer
         if kafka_producer:
             kafka_producer.close()
+
+
+def materialize_with_provenance(config):
+    """Experimental tabular emission receipts; see morph_kgc.provenance."""
+    from .provenance import materialize_with_provenance as run
+    return run(config)
